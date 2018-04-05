@@ -6,6 +6,7 @@
 #include <opencv2/core/core.hpp>
 #include <QFileDialog>
 #include <iostream>
+#include <QColor>
 
 using namespace cv;
 using namespace std;
@@ -28,6 +29,8 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->pushButton_3,SIGNAL(clicked()),this,SLOT(sobel()));
     connect(ui->pushButton_4,SIGNAL(clicked()),this,SLOT(calc_threshold()));
     connect(ui->pushButton_5,SIGNAL(clicked()),this,SLOT(gray()));
+    connect(ui->pushButton_6,SIGNAL(clicked()),this,SLOT(HSV()));
+    connect(ui->pushButton_8,SIGNAL(clicked()),this,SLOT(features()));
 }
 
 
@@ -198,4 +201,70 @@ void MainWindow::on_radioButton_4_clicked()
 void MainWindow::on_radioButton_5_clicked()
 {
     threshold_type=4;
+}
+
+void MainWindow::features()
+{
+    CvScalar MeanScalar;
+    CvScalar Scalar1;
+    //cvAvgSdv(src,&MeanScalar,&StandardDeviationScalar);
+
+    std::vector<uchar> array;
+    if (src_gray.isContinuous()) {
+      array.assign(src_gray.datastart, src_gray.dataend);
+    } else {
+      for (int i = 0; i < src_gray.rows; ++i) {
+        array.insert(array.end(), src_gray.ptr<uchar>(i), src_gray.ptr<uchar>(i)+src_gray.cols);
+      }
+    }
+
+    Scalar mean, stddev;
+    meanStdDev(src, mean, stddev);
+   // ui->lineEdit->setText(mean[0]);
+    cout<<"mean::"<<mean(0)<<endl<<"mean2::"<<mean<<endl<<"mean3::"<<mean(2)<<endl;
+    //ui->lineEdit_2->setText(QString::from(mean(0)));
+
+     //Scalar1 = cvAvg(array.);
+
+/*    Scalar mean=0;
+    for(int i=0; i<src_gray.rows; i++)
+        for(int j=0; j<src_gray.cols; j++)
+            {
+                mean = mean + src_gray.at<uchar>(i,j);
+            }
+    cout<<mean<<endl;
+
+
+       printf("Blue Channel Avg is : %.f\n",MeanScalar.val[0]);
+       printf("Blue Channel Standard Deviation is :%.f\n",StandardDeviationScalar.val[0]);
+       printf("Green Channel Avg is : %.f\n",MeanScalar.val[1]);
+       printf("Green Channel Standard Deviation is :%.f\n",StandardDeviationScalar.val[1]);
+       printf("Red Channel Avg is : %.f\n",MeanScalar.val[2]);
+       printf("Red Channel Standard Deviation is :%.f\n",StandardDeviationScalar.val[2]);*/
+
+        printf("Blue Channel Avg is : %.f\n",Scalar1.val[0]);
+        printf("Green Channel Avg is : %.f\n",Scalar1.val[1]);
+        printf("Red Channel Avg is : %.f\n",Scalar1.val[2]);
+
+}
+
+void MainWindow::HSV()
+{
+    cvtColor( src, src_hsv, CV_BGR2HSV );
+    ui->label->setPixmap(QPixmap::fromImage(QImage(src_hsv.data, src_hsv.cols, src_hsv.rows, src_hsv.step, QImage::Format_RGB888)));
+    src_hsv.copyTo(src);
+
+  //  QColor color = image.pixelColor();
+  // int hue = color.hue();
+
+    // modify hue as you’d like and write back to the image
+   // color.setHsv(hue, color.saturation(), color.value(), color.alpha());
+//    image.setPixelColor(i, j, color);
+}
+
+void MainWindow::on_pushButton_9_clicked()
+{
+    QImage image(filename);
+    src=imread(filename.toStdString());
+    ui->label->setPixmap(QPixmap::fromImage(image));
 }

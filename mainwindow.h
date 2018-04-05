@@ -26,6 +26,8 @@ private slots:
     void calc_threshold();
     void gray();
     //cv::Mat blur_img(cv::Mat);
+    void features();
+    void HSV();
 
     void on_radioButton_clicked();
     void on_radioButton_2_clicked();
@@ -33,11 +35,13 @@ private slots:
     void on_radioButton_4_clicked();
     void on_radioButton_5_clicked();
 
+    void on_pushButton_9_clicked();
+
 private:
     Ui::MainWindow *ui;
    // void blur_img();
     QString filename;
-    cv::Mat src, src_gray, dst;
+    cv::Mat src, src_gray, src_hsv, dst;
 
 };
 
