@@ -7,6 +7,7 @@
 #include <QFileDialog>
 #include <iostream>
 #include <QColor>
+#include <glcm.h>
 
 using namespace cv;
 using namespace std;
@@ -17,6 +18,10 @@ int kernel_size = 3;
 int lowThreshold;
 int const max_BINARY_value = 255;
 int threshold_type;
+int color_type;
+RNG rng(12345);
+int thresh = 100;
+
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -31,6 +36,9 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->pushButton_5,SIGNAL(clicked()),this,SLOT(gray()));
     connect(ui->pushButton_6,SIGNAL(clicked()),this,SLOT(HSV()));
     connect(ui->pushButton_8,SIGNAL(clicked()),this,SLOT(features()));
+    connect(ui->dft_button,SIGNAL(clicked()),this,SLOT(n_dft_button_clicked()));
+    connect(ui->pushButton_10,SIGNAL(clicked()),this,SLOT(on_pushButton_10_clicked()));
+
 }
 
 
@@ -122,18 +130,17 @@ void MainWindow::contour()
 
 void MainWindow::sobel()
 {
-      Mat src_gray;
       Mat grad;
       int scale = 1;
       int delta = 0;
       int ddepth = CV_16S;
 
       GaussianBlur( src, src, Size(3,3), 0, 0, BORDER_DEFAULT );
+     // cv::cvtColor(src,src,)
 
       /// Convert it to gray
       //cvtColor( src, src_gray, CV_BGR2GRAY );
-      src_gray=dst.clone();
-      cout<<dst.rows<<endl;
+      //cout<<src.rows<<endl<<src_gray.rows<<endl;
 
       /// Generate grad_x and grad_y
       Mat grad_x, grad_y;
@@ -152,8 +159,8 @@ void MainWindow::sobel()
       /// Total Gradient (approximate)
       addWeighted( abs_grad_x, 0.5, abs_grad_y, 0.5, 0, grad );
 
-      ui->label_2->setPixmap(QPixmap::fromImage(QImage(grad.data, grad.cols, grad.rows, grad.step, QImage::Format_Mono)));
-
+      ui->label_2->setPixmap(QPixmap::fromImage(QImage(grad.data, grad.cols, grad.rows, grad.step, QImage::Format_Indexed8)));
+      grad.copyTo(src_gray);
 }
 
 void::MainWindow::calc_threshold()
@@ -169,12 +176,17 @@ void::MainWindow::calc_threshold()
 
     threshold( src_gray, dst, ui->horizontalScrollBar->value(), max_BINARY_value,threshold_type);
     ui->label_2->setPixmap(QPixmap::fromImage(QImage(dst.data, dst.cols, dst.rows, dst.step, QImage::Format_Indexed8)));
+    dst.copyTo(src_gray);
 }
 
 void::MainWindow::gray()
 {
     cvtColor( src, src_gray, CV_BGR2GRAY );
     ui->label->setPixmap(QPixmap::fromImage(QImage(src_gray.data, src_gray.cols, src_gray.rows, src_gray.step, QImage::Format_Indexed8)));
+
+    ui->pushButton_3->setEnabled(true);
+    ui->pushButton_4->setEnabled(true);
+    ui->dft_button->setEnabled(true);
 }
 
 
@@ -221,8 +233,12 @@ void MainWindow::features()
     Scalar mean, stddev;
     meanStdDev(src, mean, stddev);
    // ui->lineEdit->setText(mean[0]);
-    cout<<"mean::"<<mean(0)<<endl<<"mean2::"<<mean<<endl<<"mean3::"<<mean(2)<<endl;
-    //ui->lineEdit_2->setText(QString::from(mean(0)));
+    cout<<"Blue channel mean::"<<mean(0)<<endl<<"Green channel mean::"<<mean(1)<<endl<<"Red channel mean::"<<mean(2)<<endl;
+
+    ui->lineEdit->setText(QString::number(static_cast<int>(mean(0))));
+    ui->lineEdit_2->setText(QString::number(static_cast<int>(stddev(0))));
+
+
 
      //Scalar1 = cvAvg(array.);
 
@@ -254,6 +270,8 @@ void MainWindow::HSV()
     ui->label->setPixmap(QPixmap::fromImage(QImage(src_hsv.data, src_hsv.cols, src_hsv.rows, src_hsv.step, QImage::Format_RGB888)));
     src_hsv.copyTo(src);
 
+    imshow("HSV", src_hsv);
+
   //  QColor color = image.pixelColor();
   // int hue = color.hue();
 
@@ -267,4 +285,186 @@ void MainWindow::on_pushButton_9_clicked()
     QImage image(filename);
     src=imread(filename.toStdString());
     ui->label->setPixmap(QPixmap::fromImage(image));
+}
+
+
+void MainWindow::on_dft_button_clicked()
+{
+    Mat I;
+    src_gray.copyTo(I);
+    Mat padded;                            //expand input image to optimal size
+    int m = getOptimalDFTSize( I.rows );
+    int n = getOptimalDFTSize( I.cols ); // on the border add zero values
+    copyMakeBorder(I, padded, 0, m - I.rows, 0, n - I.cols, BORDER_CONSTANT, Scalar::all(0));
+
+    Mat planes[] = {Mat_<float>(padded), Mat::zeros(padded.size(), CV_32F)};
+    Mat complexI;
+    merge(planes, 2, complexI);         // Add to the expanded another plane with zeros
+
+    dft(complexI, complexI);            // this way the result may fit in the source matrix
+
+    // compute the magnitude and switch to logarithmic scale
+    // => log(1 + sqrt(Re(DFT(I))^2 + Im(DFT(I))^2))
+    split(complexI, planes);                   // planes[0] = Re(DFT(I), planes[1] = Im(DFT(I))
+    magnitude(planes[0], planes[1], planes[0]);// planes[0] = magnitude
+    Mat magI = planes[0];
+
+    magI += Scalar::all(1);                    // switch to logarithmic scale
+    log(magI, magI);
+
+    // crop the spectrum, if it has an odd number of rows or columns
+    magI = magI(Rect(0, 0, magI.cols & -2, magI.rows & -2));
+
+    // rearrange the quadrants of Fourier image  so that the origin is at the image center
+    int cx = magI.cols/2;
+    int cy = magI.rows/2;
+
+    Mat q0(magI, Rect(0, 0, cx, cy));   // Top-Left - Create a ROI per quadrant
+    Mat q1(magI, Rect(cx, 0, cx, cy));  // Top-Right
+    Mat q2(magI, Rect(0, cy, cx, cy));  // Bottom-Left
+    Mat q3(magI, Rect(cx, cy, cx, cy)); // Bottom-Right
+
+    Mat tmp;                           // swap quadrants (Top-Left with Bottom-Right)
+    q0.copyTo(tmp);
+    q3.copyTo(q0);
+    tmp.copyTo(q3);
+
+    q1.copyTo(tmp);                    // swap quadrant (Top-Right with Bottom-Left)
+    q2.copyTo(q1);
+    tmp.copyTo(q2);
+
+    normalize(magI, magI, 0, 1, CV_MINMAX); // Transform the matrix with float values into a
+                                            // viewable image form (float between values 0 and 1).
+
+    imshow("Input Image"       , I   );    // Show the result
+    imshow("spectrum magnitude", magI);
+
+    ui->label->setPixmap(QPixmap::fromImage(QImage(I.data, src_gray.cols, I.rows, I.step, QImage::Format_Indexed8)));
+    //ui->label_5->setPixmap(QPixmap::fromImage(QImage(magI.data, magI.cols, magI.rows, magI.step, QImage::Format_Indexed8)));
+}
+
+Mat MainWindow::colorConversion()
+{
+     cvtColor(src, src_hsv, color_type);
+     return src_img;
+}
+
+void MainWindow::on_pushButton_10_clicked()
+{
+    //cv::cvtColor(src, src_LAB, CV_BGR2Lab);
+    //imshow("LAB", src_LAB);
+   // cvtColor( src_LAB, src, CV_Lab2RGB );
+    //imshow("newRGB", src);
+    cvtColor( src, src_gray, CV_BGR2GRAY );
+    blur( src_gray, src_gray, Size(3,3) );
+
+    threshold( src_gray, src_gray, 85, 255, 2);
+    GaussianBlur( src_gray, src_gray, Size(3,3), 0, 0, BORDER_DEFAULT );
+    imshow("trun", src_gray);
+
+    char* source_window = "Source";
+    namedWindow( source_window, CV_WINDOW_AUTOSIZE );
+    imshow( source_window, src );
+    //createTrackbar( " Threshold:", "Source", &thresh, 255, thresh_callback);
+    //thresh_callback( 0, 0 );
+}
+
+void MainWindow::thresh_callback(int, void*)
+{
+  Mat threshold_output;
+  vector<vector<Point> > contours;
+  vector<Vec4i> hierarchy;
+
+  /// Detect edges using Threshold
+  threshold( src_gray, threshold_output, thresh, 255, THRESH_BINARY );
+
+  /// Find contours
+  findContours( threshold_output, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0) );
+
+  /// Find the convex hull object for each contour
+  vector<vector<Point> >hull( contours.size() );
+  for( int i = 0; i < contours.size(); i++ )
+     {  convexHull( Mat(contours[i]), hull[i], false ); }
+
+  /// Draw contours + hull results
+  Mat drawing = Mat::zeros( threshold_output.size(), CV_8UC3 );
+  for( int i = 0; i< contours.size(); i++ )
+     {
+       Scalar color = Scalar( rng.uniform(0, 255), rng.uniform(0,255), rng.uniform(0,255) );
+       drawContours( drawing, contours, i, color, 1, 8, vector<Vec4i>(), 0, Point() );
+       drawContours( drawing, hull, i, color, 1, 8, vector<Vec4i>(), 0, Point() );
+     }
+
+  /// Show in a window
+  namedWindow( "Hull demo", CV_WINDOW_AUTOSIZE );
+  imshow( "Hull demo", drawing );
+}
+
+void MainWindow::glcm1();
+{
+    char key;
+    TextureEValues EValues;
+
+    // 程序运行时间统计变量
+    // the Time Statistical Variable of Program Running Time
+    double time;
+    double start;
+
+    // 纹理特征值矩阵
+    // the Matrixs of Texture Features
+    Mat imgEnergy, imgContrast, imgHomogenity, imgEntropy;
+
+    // 读取图像
+    // Read a Image
+    //img = imread("/home/aditya/Downloads/GLCM-OpenCV-master/image/Satellite.jpg");
+
+    Mat dstChannel;
+    glcm.getOneChannel(src, dstChannel, CHANNEL_B);
+
+    // 灰度量化，并统计运算时间
+    // Magnitude Gray Image, and calculate program running time
+    start = static_cast<double>(getTickCount());
+    glcm.GrayMagnitude(dstChannel, dstChannel, GRAY_8);
+    time = ((double)getTickCount() - start) / getTickFrequency() * 1000;
+    cout << "Time of Magnitude Gray Image: " << time << "ms" <<endl<<endl;
+
+    // 计算整幅图像的纹理特征值图像，并统计运算时间
+    // Calculate Texture Features of the whole Image, and calculate program running time
+    start = static_cast<double>(getTickCount());
+    glcm.CalcuTextureImages(dstChannel, imgEnergy, imgContrast, imgHomogenity, imgEntropy, 5, GRAY_8, true);
+    time = ((double)getTickCount() - start) / getTickFrequency() * 1000;
+    cout << "Time of Generate the whole Image's Calculate Texture Features Image: " << time << "ms" << endl<<endl;
+
+    start = static_cast<double>(getTickCount());
+    glcm.CalcuTextureEValue(dstChannel, EValues, 5, GRAY_8);
+    time = ((double)getTickCount() - start) / getTickFrequency() * 1000;
+    cout << "Time of Calculate Texture Features of the whole Image: " << time << "ms" << endl<<endl;
+
+    cout<<"Image's Texture EValues:"<<endl;
+    cout<<"    Contrast: "<<EValues.contrast<<endl;
+    cout<<"    Energy: "<<EValues.energy<<endl;
+    cout<<"    EntropyData: "<<EValues.entropy<<endl;
+    cout<<"    Homogenity: "<<EValues.homogenity<<endl;
+
+    FILE *fp;
+
+    char a[10],b[10],c[10],d[10];
+    sprintf(a, "%f", EValues.contrast);
+    sprintf(b, "%f", EValues.energy);
+    sprintf(c, "%f", EValues.entropy);
+    sprintf(d, "%f", EValues.homogenity);
+
+    fp = fopen("/home/aditya/Documents/test.txt", "a");
+    fprintf(fp, " %s %s %s %s ", a, b, c, d);
+
+//fprintf(fp, EValues.contrast, EValues.energy, EValues.entropy, EValues.homogenity);
+    fclose(fp);
+
+    imshow("Energy", imgEnergy);
+    imshow("Contrast", imgContrast);
+    imshow("Homogenity", imgHomogenity);
+    imshow("Entropy", imgEntropy);
+
+    key = (char) cvWaitKey(0);
+
 }
