@@ -31,7 +31,7 @@ private slots:
     void features();
     void HSV();
     cv::Mat colorConversion();
-    void glcm1();
+    void greyLCM();
 
     void on_radioButton_clicked();
     void on_radioButton_2_clicked();
@@ -52,7 +52,7 @@ private:
     QString filename, imgPath;
     cv::Mat src, src_gray, src_hsv, dst, src_img;
     void thresh_callback(int, void* );
-    QSharedPointer<GLCM> glcm;
+    //QSharedPointer<FindBeadsThread> findBeadsThread;
 
 };
 

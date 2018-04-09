@@ -38,6 +38,7 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->pushButton_8,SIGNAL(clicked()),this,SLOT(features()));
     connect(ui->dft_button,SIGNAL(clicked()),this,SLOT(n_dft_button_clicked()));
     connect(ui->pushButton_10,SIGNAL(clicked()),this,SLOT(on_pushButton_10_clicked()));
+    connect(ui->pushButton_11,SIGNAL(clicked()),this,SLOT(greyLCM()));
 
 }
 
@@ -400,71 +401,71 @@ void MainWindow::thresh_callback(int, void*)
   imshow( "Hull demo", drawing );
 }
 
-void MainWindow::glcm1();
+void MainWindow::greyLCM()
 {
-    char key;
-    TextureEValues EValues;
+        char key;
+        GLCM glcm;
+        TextureEValues EValues;
 
-    // 程序运行时间统计变量
-    // the Time Statistical Variable of Program Running Time
-    double time;
-    double start;
+        // the Time Statistical Variable of Program Running Time
+        double time;
+        double start;
 
-    // 纹理特征值矩阵
-    // the Matrixs of Texture Features
-    Mat imgEnergy, imgContrast, imgHomogenity, imgEntropy;
+        // the Matrixs of Texture Features
+        Mat imgEnergy, imgContrast, imgHomogenity, imgEntropy;
 
-    // 读取图像
-    // Read a Image
-    //img = imread("/home/aditya/Downloads/GLCM-OpenCV-master/image/Satellite.jpg");
+        // Read a Image
+        //img = imread("/home/aditya/Downloads/GLCM-OpenCV-master/image/Satellite.jpg");
 
-    Mat dstChannel;
-    glcm.getOneChannel(src, dstChannel, CHANNEL_B);
+        Mat dstChannel;
+        glcm.getOneChannel(src, dstChannel, CHANNEL_B);
 
-    // 灰度量化，并统计运算时间
-    // Magnitude Gray Image, and calculate program running time
-    start = static_cast<double>(getTickCount());
-    glcm.GrayMagnitude(dstChannel, dstChannel, GRAY_8);
-    time = ((double)getTickCount() - start) / getTickFrequency() * 1000;
-    cout << "Time of Magnitude Gray Image: " << time << "ms" <<endl<<endl;
+        // Magnitude Gray Image, and calculate program running time
+        start = static_cast<double>(getTickCount());
+        glcm.GrayMagnitude(dstChannel, dstChannel, GRAY_8);
+        time = ((double)getTickCount() - start) / getTickFrequency() * 1000;
+        cout << "Time of Magnitude Gray Image: " << time << "ms" <<endl<<endl;
 
-    // 计算整幅图像的纹理特征值图像，并统计运算时间
-    // Calculate Texture Features of the whole Image, and calculate program running time
-    start = static_cast<double>(getTickCount());
-    glcm.CalcuTextureImages(dstChannel, imgEnergy, imgContrast, imgHomogenity, imgEntropy, 5, GRAY_8, true);
-    time = ((double)getTickCount() - start) / getTickFrequency() * 1000;
-    cout << "Time of Generate the whole Image's Calculate Texture Features Image: " << time << "ms" << endl<<endl;
+        // Calculate Texture Features of the whole Image, and calculate program running time
+        start = static_cast<double>(getTickCount());
+        glcm.CalcuTextureImages(dstChannel, imgEnergy, imgContrast, imgHomogenity, imgEntropy, 5, GRAY_8, true);
+        time = ((double)getTickCount() - start) / getTickFrequency() * 1000;
+        cout << "Time of Generate the whole Image's Calculate Texture Features Image: " << time << "ms" << endl<<endl;
 
-    start = static_cast<double>(getTickCount());
-    glcm.CalcuTextureEValue(dstChannel, EValues, 5, GRAY_8);
-    time = ((double)getTickCount() - start) / getTickFrequency() * 1000;
-    cout << "Time of Calculate Texture Features of the whole Image: " << time << "ms" << endl<<endl;
+        start = static_cast<double>(getTickCount());
+        glcm.CalcuTextureEValue(dstChannel, EValues, 5, GRAY_8);
+        time = ((double)getTickCount() - start) / getTickFrequency() * 1000;
+        cout << "Time of Calculate Texture Features of the whole Image: " << time << "ms" << endl<<endl;
 
-    cout<<"Image's Texture EValues:"<<endl;
-    cout<<"    Contrast: "<<EValues.contrast<<endl;
-    cout<<"    Energy: "<<EValues.energy<<endl;
-    cout<<"    EntropyData: "<<EValues.entropy<<endl;
-    cout<<"    Homogenity: "<<EValues.homogenity<<endl;
+        cout<<"Image's Texture EValues:"<<endl;
+        cout<<"    Contrast: "<<EValues.contrast<<endl;
+        cout<<"    Energy: "<<EValues.energy<<endl;
+        cout<<"    EntropyData: "<<EValues.entropy<<endl;
+        cout<<"    Homogenity: "<<EValues.homogenity<<endl;
 
-    FILE *fp;
+        ui->lineEdit_3->setText(QString::number(EValues.contrast));
+        ui->lineEdit_6->setText(QString::number(EValues.entropy));
+        ui->lineEdit_5->setText(QString::number(EValues.energy));
+        ui->lineEdit_7->setText(QString::number(EValues.homogenity));
 
-    char a[10],b[10],c[10],d[10];
-    sprintf(a, "%f", EValues.contrast);
-    sprintf(b, "%f", EValues.energy);
-    sprintf(c, "%f", EValues.entropy);
-    sprintf(d, "%f", EValues.homogenity);
+        FILE *fp;
 
-    fp = fopen("/home/aditya/Documents/test.txt", "a");
-    fprintf(fp, " %s %s %s %s ", a, b, c, d);
+        char a[10],b[10],c[10],d[10];
+        sprintf(a, "%f", EValues.contrast);
+        sprintf(b, "%f", EValues.energy);
+        sprintf(c, "%f", EValues.entropy);
+        sprintf(d, "%f", EValues.homogenity);
 
-//fprintf(fp, EValues.contrast, EValues.energy, EValues.entropy, EValues.homogenity);
-    fclose(fp);
+        fp = fopen("/home/aditya/Documents/test.txt", "a");
+        fprintf(fp, " %s %s %s %s ", a, b, c, d);
 
-    imshow("Energy", imgEnergy);
-    imshow("Contrast", imgContrast);
-    imshow("Homogenity", imgHomogenity);
-    imshow("Entropy", imgEntropy);
+    //fprintf(fp, EValues.contrast, EValues.energy, EValues.entropy, EValues.homogenity);
+        fclose(fp);
 
-    key = (char) cvWaitKey(0);
+        imshow("Energy", imgEnergy);
+        imshow("Contrast", imgContrast);
+        imshow("Homogenity", imgHomogenity);
+        imshow("Entropy", imgEntropy);
 
+        key = (char) cvWaitKey(0);
 }
